@@ -176,12 +176,15 @@ class TSL2561(object):
         self._enable()
         self._wait()
 
-        self._i2cbus.write_byte(
+        # self._i2cbus.write_byte(
+        #     self._address,
+        #     self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN1_LOW
+        # )
+
+        result = self._i2cbus.read_block_data(
             self._address,
             self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN1_LOW
         )
-
-        result = self._i2cbus.read_byte_data(self._address, 2)
 
         print(result)
         print("---- full: %#08x" % result)
