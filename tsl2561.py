@@ -123,7 +123,10 @@ class TSL2561(object):
         else:
             return False
 
-    def setGain(self, gain=self._gain):
+    def setGain(self, gain=None):
+
+        if gain is not None:
+            self._gain = gain
 
         self._i2cbus.write_byte_data(
             self._address,
@@ -131,7 +134,10 @@ class TSL2561(object):
             self._gain | self._timing
         )
 
-    def setTiming(self, timing=self._timing):
+    def setTiming(self, timing=None):
+
+        if timing is not None:
+            self._timing = timing
 
         self._i2cbus.write_byte_data(
             self._address,
