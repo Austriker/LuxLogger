@@ -32,8 +32,8 @@ def main():
         sensor.setTiming(sensor.INTEGRATIONTIME_13MS)
 
         x = sensor.getFullLuminosity()
-        # print("Full luminosity value: %d" % x)
-        # print("Full luminosity value: %#08x" % x)
+        print("Full luminosity value: %d" % x)
+        print("Full luminosity value: %#08x" % x)
 
 
 if __name__ == "__main__":
