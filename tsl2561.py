@@ -320,6 +320,14 @@ class TSL2561(object):
 
         channel0 = result[1] << 8 | result[0]
 
+        print(result)
+
+        print(self._i2cbus.read_i2c_block_data(
+            self._address,
+            0x80 | 0x20 | 0x0C,
+            2
+        ))
+
         result = self._i2cbus.read_i2c_block_data(
             self._address,
             self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN0_LOW,
