@@ -26,10 +26,8 @@ logger.addHandler(handler)
 
 
 def main():
-    sensor = TSL2561()
+    sensor = TSL2561(bus=1)
     if sensor.findSensor():
-        sensor.setGain(sensor.GAIN_16X)
-        sensor.setTiming(sensor.INTEGRATIONTIME_13MS)
 
         while True:
             logger.info(sensor.getLuminosityJson())
