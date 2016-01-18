@@ -187,7 +187,7 @@ class TSL2561(object):
             chScale = 1 << self.LUX_CHSCALE
 
         # Scale for gain
-        if self._gain == GAIN_16X:
+        if self._gain == self.GAIN_16X:
             chScale = chScale << 4
 
         # Scale the channel values
