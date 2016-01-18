@@ -99,27 +99,97 @@ class TSL2561(object):
     INTEGRATIONTIME_13MS      = 0x00    # 13.7ms
     INTEGRATIONTIME_101MS     = 0x01    # 101ms
     INTEGRATIONTIME_402MS     = 0x02    # 402ms
-    
+
     GAIN_0X                   = 0x00    # No gain
     GAIN_16X                  = 0x10    # 16x gain
 
     address = ADDR_NORMAL
     i2cbus = 0
     package = PACKAGE_T_FN_CL
-    timing = INTEGRATIONTIME_13MS
-    gain = GAIN_0X
+    _timing = INTEGRATIONTIME_13MS
+    _gain = GAIN_0X
 
     def __init__(self, bus=0):
-        self.address = 0x39
+        self._address = 0x39
         self._i2cbus = smbus.SMBus(1)
 
     def findSensor(self):
-        self._i2cbus.write_byte(self.address, self.REGISTER_ID)
-        result = self._i2cbus.read_byte(self.address)
-
-        print("%02x" % result)
+        self._i2cbus.write_byte(self._address, self.REGISTER_ID)
+        result = self._i2cbus.read_byte(self._address)
 
         if result == 0x0A:
+            print("TSL2561 sensor found.")
             return True
+        else:
+            return False
 
-        return False
+    def setGain(self, gain=self._gain):
+
+        self._i2cbus.write_byte_data(
+            self._address,
+            self.COMMAND_BIT | self.REGISTER_TIMING,
+            self._gain | self._timing
+        )
+
+    def setTiming(self, timing=self._timing):
+
+        self._i2cbus.write_byte_data(
+            self._address,
+            self.COMMAND_BIT | self.REGISTER_TIMING,
+            self._gain | self._timing
+        )
+
+    def _enable(self):
+
+        self._i2cbus.write_byte_data(
+            self._address,
+            self.COMMAND_BIT | self.REGISTER_CONTROL,
+            self.CONTROL_POWERON
+        )
+
+    def _wait(self):
+        if self._timing == self.INTEGRATIONTIME_13MS:
+            time.sleep(0.14)
+        elif self._timing == self.INTEGRATIONTIME_101MS:
+            time.sleep(0.102)
+        elif self._timing == self.INTEGRATIONTIME_402MS:
+            time.sleep(0.403)
+        else:
+            raise ValueError("Timing error")
+
+    def _disable(self):
+
+        self._i2cbus.write_byte_data(
+            self._address,
+            self.COMMAND_BIT | self.REGISTER_CONTROL,
+            self.CONTROL_POWEROFF
+        )
+
+    def getFullLuminosity(self):
+
+        self._enable()
+        self._wait()
+
+        self._i2cbus.write_byte(
+            self._address,
+            self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN1_LOW
+        )
+
+        result = self._i2cbus.read_byte_data(self._address, 2)
+
+        print(result)
+        print("---- full: %#08x" % result)
+
+        self._i2cbus.write_byte(
+            self._address,
+            self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN0_LOW
+        )
+
+        result2 = self._i2cbus.read_byte_data(self._address, 2)
+
+        print(result2)
+        print("---- full: %#08x" % result2)
+
+        self._disable()
+
+        return None

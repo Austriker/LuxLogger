@@ -27,7 +27,13 @@ logger.addHandler(handler)
 
 def main():
     sensor = TSL2561()
-    sensor.findSensor()
+    if sensor.findSensor():
+        sensor.setGain(sensor.GAIN_16X)
+        sensor.setTiming(sensor.INTEGRATIONTIME_13MS)
+
+        x = sensor.getFullLuminosity()
+        print("Full luminosity value: %d" % x)
+        print("Full luminosity value: %#08x" % x)
 
 
 if __name__ == "__main__":
