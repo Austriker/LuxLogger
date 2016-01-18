@@ -43,7 +43,7 @@ def main():
         print("Full: %x" % full)
         print("Visible: %#x" % visible)
         print("Visible, calculated: %#x" % (full - infrared))
-        print("Lux: %d" % tsl.calculateLux(full, infrared))
+        print("Lux: %d" % sensor.calculateLux(full, infrared))
 
 
 if __name__ == "__main__":
