@@ -14,13 +14,13 @@ logger.setLevel(logging.DEBUG)
 
 handler = logging.StreamHandler()
 handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(levelname)s - %(message)s")
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 handler = logging.FileHandler(os.path.join(output_dir, filename), "w", encoding=None)
 handler.setLevel(logging.INFO)
-formatter = logging.Formatter("%(levelname)s - %(message)s")
+formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
@@ -32,7 +32,7 @@ def main():
         sensor.setTiming(sensor.INTEGRATIONTIME_13MS)
 
         while True:
-            print(sensor.getLuminosityDict())
+            logger.info(sensor.getLuminosityJson())
             time.sleep(1)
 
 

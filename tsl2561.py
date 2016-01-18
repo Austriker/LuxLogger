@@ -1,5 +1,6 @@
 import time
 import smbus
+import json
 
 
 class TSL2561(object):
@@ -319,3 +320,6 @@ class TSL2561(object):
         data['lux'] = self.calculateLux(data['full'], data['infrared'])
 
         return data
+
+    def getLuminosityJson(self):
+        return json.dumps(self.getLuminosityDict())
