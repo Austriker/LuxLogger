@@ -109,16 +109,17 @@ class TSL2561(object):
     timing = INTEGRATIONTIME_13MS
     gain = GAIN_0X
 
-    def __init__(self, address, bus=0):
-        self.address = address
-        self._i2cbus = smbus.SMBus(bus)
-
     def __init__(self, bus=0):
         self.address = 0x39
-        self.i2cbus = smbus.SMBus(bus)
+        self._i2cbus = smbus.SMBus(1)
 
-    def find(self):
-        self._i2cbus.write_byte_data(address, self.REGISTER_ID)
-        result = self._i2cbus.read_byte_data(address, 1)
+    def findSensor(self):
+        self._i2cbus.write_byte(self.address, self.REGISTER_ID)
+        result = self._i2cbus.read_byte(self.address)
 
-        print(result)
+        print("%02x" % result)
+
+        if result == 0x0A:
+            return True
+
+        return False

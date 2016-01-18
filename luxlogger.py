@@ -27,7 +27,7 @@ logger.addHandler(handler)
 
 def main():
     sensor = TSL2561()
-    sensor.find()
+    sensor.findSensor()
 
 
 if __name__ == "__main__":
