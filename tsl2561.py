@@ -308,3 +308,14 @@ class TSL2561(object):
 
         # Signal I2C had no errors
         return lux
+
+    def getLuminosityDict(self):
+
+        data = {}
+
+        data['full'] = self.getLuminosity(self.FULLSPECTRUM)
+        data['visible'] = self.getLuminosity(self.VISIBLE)
+        data['infrared'] = self.getLuminosity(self.INFRARED)
+        data['lux'] = self.calculateLux(data['full'], data['infrared'])
+
+        return data
