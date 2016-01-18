@@ -197,7 +197,7 @@ class TSL2561(object):
         # Find the ratio of the channel values
         ratio1 = 0
         if channel0 != 0:
-            ratio1 = (channel1 << (self.LUX_RATIOSCALE + 1)) / channel0
+            ratio1 = (channel1 << (self.LUX_RATIOSCALE + 1)) // channel0
 
         # Round the ration value
         ratio = (ratio1 + 1) >> 1
