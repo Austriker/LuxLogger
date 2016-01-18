@@ -117,11 +117,19 @@ class TSL2561(object):
         self._i2cbus.write_byte(self._address, self.REGISTER_ID)
         result = self._i2cbus.read_byte(self._address)
 
+        result2 = self._i2cbus.read_i2c_block_data(
+            self._address,
+            self.REGISTER_ID,
+            1
+        )
+
+        print("%02x" % result2)
+
         if result == 0x0A:
             print("TSL2561 sensor found.")
             return True
         else:
-            return False
+            raise ValueError("TSL2561 sensor not found")
 
     def setGain(self, gain=None):
 
