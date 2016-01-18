@@ -310,6 +310,69 @@ class TSL2561(object):
         # Signal I2C had no errors
         return lux
 
+    def getLux(self):
+
+        result = self._i2cbus.read_i2c_block_data(
+            self._address,
+            self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN1_LOW,
+            2
+        )
+
+        channel0 = result[1] << 8 | result[0]
+
+        result = self._i2cbus.read_i2c_block_data(
+            self._address,
+            self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN0_LOW,
+            2
+        )
+
+        channel1 = result[1] << 8 | result[0]
+
+        # If either sensor is satulated, no acculate lux value
+        # can be achieved.
+        if (channel0 == 0xffff or channel1 == 0xffff):
+            lux = None
+            print("sensor saturated")
+
+        d0 = float(channel0)
+        d1 = float(channel1)
+
+        if (d0 == 0):
+            # Sometimes, the channel0 returns 0 when dark...
+            lux = 0.0
+            print("Channel 0 is dark")
+            return lux
+
+        ratio = d1 / d0
+
+        integ_scale = 1
+        if (self._timing == INTEGRATIONTIME_13MS):
+            integ_scale = 402.0 / 13.7
+        elif (self._timing == INTEGRATIONTIME_101MS):
+            integ_scale = 402.0 / 101.0
+        else:
+            print("wrong integration time")
+
+        d0 = d0 * integ_scale
+        d1 = d1 * integ_scale
+
+        if (self._gain == GAIN_16X):
+            d0 = d0 / 16
+            d1 = d1 / 16
+
+        if (ratio < 0.5):
+            lux = 0.0304 * d0 - 0.062 * d0 * (ratio ** 1.4)
+        elif (ratio < 0.61):
+            lux = 0.0224 * d0 - 0.031 * d1
+        elif (ratio < 0.80):
+            lux = 0.0128 * d0 - 0.0153 * d1
+        elif (ratio < 1.30):
+            lux = 0.00146 * d0 - 0.00112 * d1
+        else:
+            lux = 0.0
+
+    return lux
+
     def getLuminosityDict(self):
 
         data = {}
@@ -318,6 +381,7 @@ class TSL2561(object):
         data['visible'] = self.getLuminosity(self.VISIBLE)
         data['infrared'] = self.getLuminosity(self.INFRARED)
         data['lux'] = self.calculateLux(data['full'], data['infrared'])
+        data['lux_v2'] = self.getLux()
 
         return data
 

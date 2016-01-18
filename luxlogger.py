@@ -28,7 +28,7 @@ logger.addHandler(handler)
 def main():
     sensor = TSL2561()
     if sensor.findSensor():
-        sensor.setGain(sensor.GAIN_16X)
+        sensor.setGain(sensor.GAIN_0X)
         sensor.setTiming(sensor.INTEGRATIONTIME_13MS)
 
         while True:
