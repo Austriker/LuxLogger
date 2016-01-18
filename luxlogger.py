@@ -35,6 +35,16 @@ def main():
         print("Full luminosity value: %d" % x)
         print("Full luminosity value: %#08x" % x)
 
+        full = sensor.getLuminosity(sensor.FULLSPECTRUM)
+        visible = sensor.getLuminosity(sensor.VISIBLE)
+        infrared = sensor.getLuminosity(sensor.INFRARED)
+
+        print("IR: %x" % infrared)
+        print("Full: %x" % full)
+        print("Visible: %#x" % visible)
+        print("Visible, calculated: %#x" % (full - infrared))
+        print("Lux: %d" % tsl.calculateLux(full, infrared))
+
 
 if __name__ == "__main__":
     main()

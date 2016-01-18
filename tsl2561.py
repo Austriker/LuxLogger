@@ -104,8 +104,7 @@ class TSL2561(object):
     GAIN_16X                  = 0x10    # 16x gain
 
     address = ADDR_NORMAL
-    i2cbus = 0
-    package = PACKAGE_T_FN_CL
+    _package = PACKAGE_T_FN_CL
     _timing = INTEGRATIONTIME_13MS
     _gain = GAIN_0X
 
@@ -114,16 +113,12 @@ class TSL2561(object):
         self._i2cbus = smbus.SMBus(1)
 
     def findSensor(self):
-        self._i2cbus.write_byte(self._address, self.REGISTER_ID)
-        result = self._i2cbus.read_byte(self._address)
 
-        result2 = self._i2cbus.read_i2c_block_data(
+        result = self._i2cbus.read_i2c_block_data(
             self._address,
             self.REGISTER_ID,
             1
-        )
-
-        print("%02x" % result2)
+        )[0]
 
         if result == 0x0A:
             print("TSL2561 sensor found.")
@@ -190,27 +185,126 @@ class TSL2561(object):
             2
         )
 
-        print(result)
-
         full = result[1] << 8 | result[0]
 
-        print("---- full: %#08x" % full)
-
-        result2 = self._i2cbus.read_i2c_block_data(
+        result = self._i2cbus.read_i2c_block_data(
             self._address,
             self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN0_LOW,
             2
         )
 
         full = full << 8
-
-        print(result2)
-
-        result2 = result2[1] << 8 | result2[0]
-        print("---- full: %#08x" % result2)
-
-        full += result2
+        full += result[1] << 8 | result[0]
 
         self._disable()
 
         return full
+
+    def getLuminosity(self, channel):
+        x = self.getFullLuminosity()
+
+        if channel == self.FULLSPECTRUM:
+            # Reads two byte value from channel 0 (visible + infrared)
+            result = x & 0xFFFF
+            return result
+
+        if channel == self.INFRARED:
+            # Reads two byte value from channel 1 (infrared)
+            result = x >> 16
+            return result
+
+        if channel == self.VISIBLE:
+            # Reads all and subtracts out just the visible!
+            result = (x & 0xFFFF) - (x >> 16)
+            return result
+
+        return 0
+
+    def calculateLux(self, ch0, ch1):
+        # default is no scaling ... integration time = 402ms
+        chScale = (1 << self.LUX_CHSCALE)
+
+        if self._timing == self.INTEGRATIONTIME_13MS:
+            chScale = self.LUX_CHSCALE_TINT0
+        if self._timing == self.INTEGRATIONTIME_101MS:
+            chScale = self.LUX_CHSCALE_TINT1
+
+        # Scale for gain (1x or 16x)
+        chScale = chScale * self._gain
+
+        # scale the channel values
+        channel0 = (ch0 * chScale) >> self.LUX_CHSCALE
+        channel1 = (ch1 * chScale) >> self.LUX_CHSCALE
+
+        # find the ratio of the channel values (Channel1/Channel0)
+        ratio = 0
+        if channel0 != 0:
+            ratio = (channel1 << (self.LUX_RATIOSCALE + 1)) // channel0
+
+        # round the ratio value
+        ratio = (ratio + 1) >> 1
+
+        if self._package == self.PACKAGE_T_FN_CL:
+            if (ratio >= 0) and (ratio <= self.LUX_K1T):
+                b = self.LUX_B1T
+                m = self.LUX_M1T
+            elif ratio <= self.LUX_K2T:
+                b = self.LUX_B2T
+                m = self.LUX_M2T
+            elif ratio <= self.LUX_K3T:
+                b = self.LUX_B3T
+                m = self.LUX_M3T
+            elif ratio <= self.LUX_K4T:
+                b = self.LUX_B4T
+                m = self.LUX_M4T
+            elif ratio <= self.LUX_K5T:
+                b = self.LUX_B5T
+                m = self.LUX_M5T
+            elif ratio <= self.LUX_K6T:
+                b = self.LUX_B6T
+                m = self.LUX_M6T
+            elif ratio <= self.LUX_K7T:
+                b = self.LUX_B7T
+                m = self.LUX_M7T
+            elif ratio <= self.LUX_K8T:
+                b = self.LUX_B8T
+                m = self.LUX_M8T
+        else:
+            # PACKAGE_CS otherwise
+            if (ratio >= 0) and (ratio <= self.LUX_K1C):
+                b = self.LUX_B1C
+                m = self.LUX_M1C
+            elif ratio <= self.LUX_K2C:
+                b = self.LUX_B2C
+                m = self.LUX_M2C
+            elif ratio <= self.LUX_K3C:
+                b = self.LUX_B3C
+                m = self.LUX_M3C
+            elif ratio <= self.LUX_K4C:
+                b = self.LUX_B4C
+                m = self.LUX_M4C
+            elif ratio <= self.LUX_K5C:
+                b = self.LUX_B5C
+                m = self.LUX_M5C
+            elif ratio <= self.LUX_K6C:
+                b = self.LUX_B6C
+                m = self.LUX_M6C
+            elif ratio <= self.LUX_K7C:
+                b = self.LUX_B7C
+                m = self.LUX_M7C
+            elif ratio <= self.LUX_K8C:
+                b = self.LUX_B8C
+                m = self.LUX_M8C
+
+        temp = ((channel0 * b) - (channel1 * m))
+        # do not allow negative lux value
+        if temp < 0:
+            temp = 0
+        # round lsb (2^(LUX_SCALE-1))
+        temp += (1 << (self.LUX_LUXSCALE-1))
+
+        # strip off fractional portion
+        lux = temp >> self.LUX_LUXSCALE
+
+        # Signal I2C had no errors
+        return lux
