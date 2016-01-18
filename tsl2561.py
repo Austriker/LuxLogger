@@ -371,7 +371,7 @@ class TSL2561(object):
         else:
             lux = 0.0
 
-    return lux
+        return lux
 
     def getLuminosityDict(self):
 
