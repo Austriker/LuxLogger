@@ -301,7 +301,7 @@ class TSL2561(object):
         print("chan0 : %#08x" % chan0)
 
         print("full : %#016x" % (chan1 << 16))
-        
+
         full = (chan1 << 16) | chan0
         print("full : %#016x" % full)
 
@@ -309,34 +309,42 @@ class TSL2561(object):
 
         return full
 
-    def getLuminosity(self, channel):
+    def getLuminosity(self):
         x = self.getFullLuminosity()
 
-        if channel == self.FULLSPECTRUM:
-            # Reads two byte value from channel 0 (visible + infrared)
-            result = x & 0xFFFF
-            return result
+        full = x & 0xFFFF
+        ir = x >> 16
+        visi = (x & 0xFFFF) - (x >> 16)
 
-        elif channel == self.INFRARED:
-            # Reads two byte value from channel 1 (infrared)
-            result = x >> 16
-            return result
+        return full, ir, visi
 
-        elif channel == self.VISIBLE:
-            # Reads all and subtracts out just the visible!
-            result = (x & 0xFFFF) - (x >> 16)
-            return result
+        # if channel == self.FULLSPECTRUM:
+        #     # Reads two byte value from channel 0 (visible + infrared)
+        #     result = x & 0xFFFF
+        #     return result
 
-        else:
-            return None
+        # elif channel == self.INFRARED:
+        #     # Reads two byte value from channel 1 (infrared)
+        #     result = x >> 16
+        #     return result
+
+        # elif channel == self.VISIBLE:
+        #     # Reads all and subtracts out just the visible!
+        #     result = (x & 0xFFFF) - (x >> 16)
+        #     return result
+
+        # else:
+        # return None
 
     def getLuminosityDict(self):
 
         data = {}
 
-        data['full'] = self.getLuminosity(self.FULLSPECTRUM)
-        data['visible'] = self.getLuminosity(self.VISIBLE)
-        data['infrared'] = self.getLuminosity(self.INFRARED)
+        data['full'], data['infrared'], data['visible'] = self.getLuminosity()
+
+        # data['full'] = self.getLuminosity(self.FULLSPECTRUM)
+        # data['visible'] = self.getLuminosity(self.VISIBLE)
+        # data['infrared'] = self.getLuminosity(self.INFRARED)
         data['lux'] = self.calculateLux(data['full'], data['infrared'])
 
         return data
