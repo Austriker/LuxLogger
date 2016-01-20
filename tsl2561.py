@@ -298,10 +298,12 @@ class TSL2561(object):
             2
         )
         chan0 = (result[1] << 8) | result[0]
-        print("chan1 : %#08x" % chan0)
+        print("chan0 : %#08x" % chan0)
 
+        print("full : %#016x" % (chan1 << 16))
+        
         full = (chan1 << 16) | chan0
-        print("full : %#08x" % full)
+        print("full : %#016x" % full)
 
         self._disable()
 
