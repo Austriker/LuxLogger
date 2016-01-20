@@ -1,353 +1,297 @@
+'''Driver for the TSL2561 digital luminosity (light) sensors.
+
+Pick one up at http://www.adafruit.com/products/439
+
+Adafruit invests time and resources providing this open source code,
+please support Adafruit and open-source hardware by purchasing
+products from Adafruit!
+
+Code ported from Adafruit Arduino library,
+commit ced9f731da5095988cd66158562c2fde659e0510:
+https://github.com/adafruit/Adafruit_TSL2561
+'''
+
 import time
-import smbus
-import json
+from adafruit_i2c import Adafruit_I2C
+from constants import *
+
+__author__ = 'Hugo SERRAT'
+__credits__ = [
+    'K.Townsend (Adafruit Industries)',
+    'Georges Toth <georges@trypill.org>'
+]
+__license__ = 'BSD'
+__version__ = 'v2.0'
+
+'''HISTORY
+v3.0 - Rewrote the i2c lib to make it work with python3
+v2.0 - Rewrote driver for Adafruit_Sensor and Auto-Gain support, and
+       added lux clipping check (returns 0 lux on sensor saturation)
+v1.0 - First release (previously TSL2561)
+'''
 
 
 class TSL2561(object):
-    VISIBLE = 2       # channel 0 - channel 1
-    INFRARED = 1       # channel 1
-    FULLSPECTRUM = 0       # channel 0
-
-    # 3 i2c address options!
-    ADDR_LOW = 0x29
-    ADDR_NORMAL = 0x39
-    ADDR_HIGH = 0x49
-
-    # Lux calculations differ slightly for CS package
-    PACKAGE_CS = 0
-    PACKAGE_T_FN_CL = 1
-
-    READBIT = 0x01
-    COMMAND_BIT = 0x80    # Must be 1
-    CLEAR_BIT = 0x40    # Clears any pending interrupt (write 1 to clear)
-    WORD_BIT = 0x20    # 1 = read/write word (rather than byte)
-    BLOCK_BIT = 0x10    # 1 = using block read/write
-
-    CONTROL_POWERON = 0x03
-    CONTROL_POWEROFF = 0x00
-
-    LUX_LUXSCALE = 14      # Scale by 2^14
-    LUX_RATIOSCALE = 9       # Scale ratio by 2^9
-    LUX_CHSCALE = 10      # Scale channel values by 2^10
-    LUX_CHSCALE_TINT0 = 0x7517  # 322/11 * 2^    LUX_CHSCALE
-    LUX_CHSCALE_TINT1 = 0x0FE7  # 322/81 * 2^    LUX_CHSCALE
-
-    LUX_K1T = 0x0040   # 0.125 * 2^RATIO_SCALE
-    LUX_B1T = 0x01f2   # 0.0304 * 2^    LUX_SCALE
-    LUX_M1T = 0x01be   # 0.0272 * 2^    LUX_SCALE
-    LUX_K2T = 0x0080   # 0.250 * 2^RATIO_SCALE
-    LUX_B2T = 0x0214   # 0.0325 * 2^    LUX_SCALE
-    LUX_M2T = 0x02d1   # 0.0440 * 2^    LUX_SCALE
-    LUX_K3T = 0x00c0   # 0.375 * 2^RATIO_SCALE
-    LUX_B3T = 0x023f   # 0.0351 * 2^    LUX_SCALE
-    LUX_M3T = 0x037b   # 0.0544 * 2^    LUX_SCALE
-    LUX_K4T = 0x0100   # 0.50 * 2^RATIO_SCALE
-    LUX_B4T = 0x0270   # 0.0381 * 2^    LUX_SCALE
-    LUX_M4T = 0x03fe   # 0.0624 * 2^    LUX_SCALE
-    LUX_K5T = 0x0138   # 0.61 * 2^RATIO_SCALE
-    LUX_B5T = 0x016f   # 0.0224 * 2^    LUX_SCALE
-    LUX_M5T = 0x01fc   # 0.0310 * 2^    LUX_SCALE
-    LUX_K6T = 0x019a   # 0.80 * 2^RATIO_SCALE
-    LUX_B6T = 0x00d2   # 0.0128 * 2^    LUX_SCALE
-    LUX_M6T = 0x00fb   # 0.0153 * 2^    LUX_SCALE
-    LUX_K7T = 0x029a   # 1.3 * 2^RATIO_SCALE
-    LUX_B7T = 0x0018   # 0.00146 * 2^    LUX_SCALE
-    LUX_M7T = 0x0012   # 0.00112 * 2^    LUX_SCALE
-    LUX_K8T = 0x029a   # 1.3 * 2^RATIO_SCALE
-    LUX_B8T = 0x0000   # 0.000 * 2^    LUX_SCALE
-    LUX_M8T = 0x0000   # 0.000 * 2^    LUX_SCALE
-
-    # CS package values
-    LUX_K1C = 0x0043   # 0.130 * 2^RATIO_SCALE
-    LUX_B1C = 0x0204   # 0.0315 * 2^    LUX_SCALE
-    LUX_M1C = 0x01ad   # 0.0262 * 2^    LUX_SCALE
-    LUX_K2C = 0x0085   # 0.260 * 2^RATIO_SCALE
-    LUX_B2C = 0x0228   # 0.0337 * 2^    LUX_SCALE
-    LUX_M2C = 0x02c1   # 0.0430 * 2^    LUX_SCALE
-    LUX_K3C = 0x00c8   # 0.390 * 2^RATIO_SCALE
-    LUX_B3C = 0x0253   # 0.0363 * 2^    LUX_SCALE
-    LUX_M3C = 0x0363   # 0.0529 * 2^    LUX_SCALE
-    LUX_K4C = 0x010a   # 0.520 * 2^RATIO_SCALE
-    LUX_B4C = 0x0282   # 0.0392 * 2^    LUX_SCALE
-    LUX_M4C = 0x03df   # 0.0605 * 2^    LUX_SCALE
-    LUX_K5C = 0x014d   # 0.65 * 2^RATIO_SCALE
-    LUX_B5C = 0x0177   # 0.0229 * 2^    LUX_SCALE
-    LUX_M5C = 0x01dd   # 0.0291 * 2^    LUX_SCALE
-    LUX_K6C = 0x019a   # 0.80 * 2^RATIO_SCALE
-    LUX_B6C = 0x0101   # 0.0157 * 2^    LUX_SCALE
-    LUX_M6C = 0x0127   # 0.0180 * 2^    LUX_SCALE
-    LUX_K7C = 0x029a   # 1.3 * 2^RATIO_SCALE
-    LUX_B7C = 0x0037   # 0.00338 * 2^    LUX_SCALE
-    LUX_M7C = 0x002b   # 0.00260 * 2^    LUX_SCALE
-    LUX_K8C = 0x029a   # 1.3 * 2^RATIO_SCALE
-    LUX_B8C = 0x0000   # 0.000 * 2^    LUX_SCALE
-    LUX_M8C = 0x0000   # 0.000 * 2^    LUX_SCALE
-
-    REGISTER_CONTROL = 0x00
-    REGISTER_TIMING = 0x01
-    REGISTER_THRESHHOLDL_LOW = 0x02
-    REGISTER_THRESHHOLDL_HIGH = 0x03
-    REGISTER_THRESHHOLDH_LOW = 0x04
-    REGISTER_THRESHHOLDH_HIGH = 0x05
-    REGISTER_INTERRUPT = 0x06
-    REGISTER_CRC = 0x08
-    REGISTER_ID = 0x0A
-    REGISTER_CHAN0_LOW = 0x0C
-    REGISTER_CHAN0_HIGH = 0x0D
-    REGISTER_CHAN1_LOW = 0x0E
-    REGISTER_CHAN1_HIGH = 0x0F
-
-    INTEGRATIONTIME_13MS = 0x00    # 13.7ms
-    INTEGRATIONTIME_101MS = 0x01    # 101ms
-    INTEGRATIONTIME_402MS = 0x02    # 402ms
-
-    GAIN_0X = 0x00    # No gain
-    GAIN_16X = 0x10    # 16x gain
-
-    _package = PACKAGE_T_FN_CL
-    _integration = INTEGRATIONTIME_13MS
-
-    def __init__(self, bus=0):
-        self._address = 0x39
-        self._i2cbus = smbus.SMBus(bus)
-        self._gain = self.GAIN_16X
-
-    def _enable(self):
-
-        self._i2cbus.write_byte_data(
-            self._address,
-            self.COMMAND_BIT | self.REGISTER_CONTROL,
-            self.CONTROL_POWERON
-        )
-
-    def _disable(self):
-
-        self._i2cbus.write_byte_data(
-            self._address,
-            self.COMMAND_BIT | self.REGISTER_CONTROL,
-            self.CONTROL_POWEROFF
-        )
-
-    def setGain(self, gain=None):
-
-        self._enable()
-
-        if gain is not None:
-            self._gain = gain
-
-        self._i2cbus.write_byte_data(
-            self._address,
-            self.COMMAND_BIT | self.REGISTER_TIMING,
-            self._integration | self._gain
-        )
-
-        self._disable()
-
-    def setTiming(self, integration=None):
-
-        self._enable()
-
-        if integration is not None:
-            self._integration = integration
-
-        self._i2cbus.write_byte_data(
-            self._address,
-            self.COMMAND_BIT | self.REGISTER_TIMING,
-            self._integration | self._gain
-        )
-
-        self._disable()
-
-    def findSensor(self):
-
-        result = self._i2cbus.read_i2c_block_data(
-            self._address,
-            self.REGISTER_ID,
-            1
-        )[0]
-
-        if result == 0x0A:
-            print("TSL2561 sensor found.")
-
-            self.setTiming()
-            self.setGain()
-
-            self._disable()
-            return True
+    '''Driver for the TSL2561 digital luminosity (light) sensors.'''
+    def __init__(self, address=None,
+                 integration_time=TSL2561_DELAY_INTTIME_402MS,
+                 gain=TSL2561_GAIN_1X, autogain=False, debug=False):
+        if address is not None:
+            self.address = address
         else:
-            raise ValueError("TSL2561 sensor not found")
+            self.address = TSL2561_ADDR_FLOAT
 
-    def calculateLux(self, ch0, ch1):
+        self.i2c = Adafruit_I2C(self.address)
 
-        if self._integration == self.INTEGRATIONTIME_13MS:
-            print("integration 13ms")
-            chScale = self.LUX_CHSCALE_TINT0
-        elif self._integration == self.INTEGRATIONTIME_101MS:
-            chScale = self.LUX_CHSCALE_TINT1
+        self.debug = debug
+        self.integration_time = integration_time
+        self.gain = gain
+        self.autogain = autogain
+
+        self._begin()
+
+    def _begin(self):
+        '''Initializes I2C and configures the sensor (call this function before
+        doing anything else)
+        '''
+        # Make sure we're actually connected
+        x = self.i2c.readU8(TSL2561_REGISTER_ID)
+
+        if not x & 0x0A:
+            raise Exception('TSL2561 not found!')
+        ##########
+
+        # Set default integration time and gain
+        self.set_integration_time(self.integration_time)
+        self.set_gain(self.gain)
+
+        # Note: by default, the device is in power down mode on bootup
+        self.disable()
+
+    def enable(self):
+        '''Enable the device by setting the control bit to 0x03'''
+        self.i2c.write8(TSL2561_COMMAND_BIT | TSL2561_REGISTER_CONTROL,
+                        TSL2561_CONTROL_POWERON)
+
+    def disable(self):
+        '''Disables the device (putting it in lower power sleep mode)'''
+        self.i2c.write8(TSL2561_COMMAND_BIT | TSL2561_REGISTER_CONTROL,
+                        TSL2561_CONTROL_POWEROFF)
+
+    @staticmethod
+    def delay(value):
+        '''Delay times must be specified in milliseconds but as the python
+        sleep function only takes (float) seconds we need to convert the sleep
+        time first
+        '''
+        time.sleep(value / 1000.0)
+
+    def _get_data(self):
+        '''Private function to read luminosity on both channels'''
+
+        # Enable the device by setting the control bit to 0x03
+        self.enable()
+
+        # Wait x ms for ADC to complete
+        TSL2561.delay(self.integration_time)
+
+        # Reads a two byte value from channel 0 (visible + infrared)
+        broadband = self.i2c.readU16(TSL2561_COMMAND_BIT | TSL2561_WORD_BIT |
+                                     TSL2561_REGISTER_CHAN0_LOW)
+
+        # Reads a two byte value from channel 1 (infrared)
+        ir = self.i2c.readU16(TSL2561_COMMAND_BIT | TSL2561_WORD_BIT |
+                              TSL2561_REGISTER_CHAN1_LOW)
+
+        # Turn the device off to save power
+        self.disable()
+
+        return (broadband, ir)
+
+    def set_integration_time(self, integration_time):
+        '''Sets the integration time for the TSL2561'''
+
+        # Enable the device by setting the control bit to 0x03
+        self.enable()
+
+        self.integration_time = integration_time
+
+        # Update the timing register
+        self.i2c.write8(TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING,
+                        self.integration_time | self.gain)
+
+        # Turn the device off to save power
+        self.disable()
+
+    def set_gain(self, gain):
+        '''Adjusts the gain on the TSL2561 (adjusts the sensitivity to light)
+        '''
+
+        # Enable the device by setting the control bit to 0x03
+        self.enable()
+
+        self.gain = gain
+
+        # Update the timing register
+        self.i2c.write8(TSL2561_COMMAND_BIT | TSL2561_REGISTER_TIMING,
+                        self.integration_time | self.gain)
+
+        # Turn the device off to save power
+        self.disable()
+
+    def set_auto_range(self, value):
+        '''Enables or disables the auto-gain settings when reading
+        data from the sensor
+        '''
+        self.autogain = value
+
+    def _get_luminosity(self):
+        '''Gets the broadband (mixed lighting) and IR only values from
+        the TSL2561, adjusting gain if auto-gain is enabled
+        '''
+        valid = False
+
+        # If Auto gain disabled get a single reading and continue
+        if not self.autogain:
+            return self._get_data()
+
+        # Read data until we find a valid range
+        _agcCheck = False
+        broadband = 0
+        ir = 0
+
+        while not valid:
+            if self.integration_time == TSL2561_INTEGRATIONTIME_13MS:
+                _hi = TSL2561_AGC_THI_13MS
+                _lo = TSL2561_AGC_TLO_13MS
+            elif self.integration_time == TSL2561_INTEGRATIONTIME_101MS:
+                _hi = TSL2561_AGC_THI_101MS
+                _lo = TSL2561_AGC_TLO_101MS
+            else:
+                _hi = TSL2561_AGC_THI_402MS
+                _lo = TSL2561_AGC_TLO_402MS
+
+            _b, _ir = self._get_data()
+
+            # Run an auto-gain check if we haven't already done so ...
+            if not _agcCheck:
+                if _b < _lo and self.gain == TSL2561_GAIN_1X:
+                    # Increase the gain and try again
+                    self.set_gain(TSL2561_GAIN_16X)
+                    # Drop the previous conversion results
+                    _b, _ir = self._get_data()
+                    # Set a flag to indicate we've adjusted the gain
+                    _agcCheck = True
+                elif _b > _hi and self.gain == TSL2561_GAIN_16X:
+                    # Drop gain to 1x and try again
+                    self.set_gain(TSL2561_GAIN_1X)
+                    # Drop the previous conversion results
+                    _b, _ir = self._get_data()
+                    # Set a flag to indicate we've adjusted the gain
+                    _agcCheck = True
+                else:
+                    # Nothing to look at here, keep moving ....
+                    # Reading is either valid, or we're already at the chips
+                    # limits
+                    broadband = _b
+                    ir = _ir
+                    valid = True
+            else:
+                # If we've already adjusted the gain once, just return the new
+                # results.
+                # This avoids endless loops where a value is at one extreme
+                # pre-gain, and the the other extreme post-gain
+                broadband = _b
+                ir = _ir
+                valid = True
+
+        return (broadband, ir)
+
+    def _calculate_lux(self, broadband, ir):
+        '''Converts the raw sensor values to the standard SI lux equivalent.
+        Returns 0 if the sensor is saturated and the values are unreliable.
+        '''
+        # Make sure the sensor isn't saturated!
+        if self.integration_time == TSL2561_INTEGRATIONTIME_13MS:
+            clipThreshold = TSL2561_CLIPPING_13MS
+        elif self.integration_time == TSL2561_INTEGRATIONTIME_101MS:
+            clipThreshold = TSL2561_CLIPPING_101MS
         else:
-            chScale = 1 << self.LUX_CHSCALE
+            clipThreshold = TSL2561_CLIPPING_402MS
 
-        # Scale for gain
-        if self._gain == self.GAIN_16X:
-            print("Scale Gain")
+        # Return 0 lux if the sensor is saturated
+        if broadband > clipThreshold or ir > clipThreshold:
+            raise Exception('Sensor is saturated')
+
+        # Get the correct scale depending on the integration time
+        if self.integration_time == TSL2561_INTEGRATIONTIME_13MS:
+            chScale = TSL2561_LUX_CHSCALE_TINT0
+        elif self.integration_time == TSL2561_INTEGRATIONTIME_101MS:
+            chScale = TSL2561_LUX_CHSCALE_TINT1
+        else:
+            chScale = 1 << TSL2561_LUX_CHSCALE
+
+        # Scale for gain (1x or 16x)
+        if not self.gain:
             chScale = chScale << 4
 
         # Scale the channel values
-        channel0 = (ch0 * chScale) >> self.LUX_CHSCALE
-        channel1 = (ch1 * chScale) >> self.LUX_CHSCALE
+        channel0 = (broadband * chScale) >> TSL2561_LUX_CHSCALE
+        channel1 = (ir * chScale) >> TSL2561_LUX_CHSCALE
 
-        # Find the ratio of the channel values
+        # Find the ratio of the channel values (Channel1/Channel0)
         ratio1 = 0
         if channel0 != 0:
-            ratio1 = (channel1 << (self.LUX_RATIOSCALE + 1)) // channel0
+            ratio1 = (channel1 << (TSL2561_LUX_RATIOSCALE + 1)) / channel0
 
-        # Round the ration value
+        # round the ratio value
         ratio = (ratio1 + 1) >> 1
 
-        if self._package == self.PACKAGE_T_FN_CL:
-            print("TFN package")
-            if (ratio >= 0) and (ratio <= self.LUX_K1T):
-                b = self.LUX_B1T
-                m = self.LUX_M1T
-            elif ratio <= self.LUX_K2T:
-                b = self.LUX_B2T
-                m = self.LUX_M2T
-            elif ratio <= self.LUX_K3T:
-                b = self.LUX_B3T
-                m = self.LUX_M3T
-            elif ratio <= self.LUX_K4T:
-                b = self.LUX_B4T
-                m = self.LUX_M4T
-            elif ratio <= self.LUX_K5T:
-                b = self.LUX_B5T
-                m = self.LUX_M5T
-            elif ratio <= self.LUX_K6T:
-                b = self.LUX_B6T
-                m = self.LUX_M6T
-            elif ratio <= self.LUX_K7T:
-                b = self.LUX_B7T
-                m = self.LUX_M7T
-            elif ratio <= self.LUX_K8T:
-                b = self.LUX_B8T
-                m = self.LUX_M8T
-        else:
-            # PACKAGE_CS otherwise
-            if (ratio >= 0) and (ratio <= self.LUX_K1C):
-                b = self.LUX_B1C
-                m = self.LUX_M1C
-            elif ratio <= self.LUX_K2C:
-                b = self.LUX_B2C
-                m = self.LUX_M2C
-            elif ratio <= self.LUX_K3C:
-                b = self.LUX_B3C
-                m = self.LUX_M3C
-            elif ratio <= self.LUX_K4C:
-                b = self.LUX_B4C
-                m = self.LUX_M4C
-            elif ratio <= self.LUX_K5C:
-                b = self.LUX_B5C
-                m = self.LUX_M5C
-            elif ratio <= self.LUX_K6C:
-                b = self.LUX_B6C
-                m = self.LUX_M6C
-            elif ratio <= self.LUX_K7C:
-                b = self.LUX_B7C
-                m = self.LUX_M7C
-            elif ratio <= self.LUX_K8C:
-                b = self.LUX_B8C
-                m = self.LUX_M8C
+        b = 0
+        m = 0
 
-        temp = ((channel0 * b) - (channel1 * m))
+        if ratio >= 0 and ratio <= TSL2561_LUX_K1T:
+            b = TSL2561_LUX_B1T
+            m = TSL2561_LUX_M1T
+        elif ratio <= TSL2561_LUX_K2T:
+            b = TSL2561_LUX_B2T
+            m = TSL2561_LUX_M2T
+        elif ratio <= TSL2561_LUX_K3T:
+            b = TSL2561_LUX_B3T
+            m = TSL2561_LUX_M3T
+        elif ratio <= TSL2561_LUX_K4T:
+            b = TSL2561_LUX_B4T
+            m = TSL2561_LUX_M4T
+        elif ratio <= TSL2561_LUX_K5T:
+            b = TSL2561_LUX_B5T
+            m = TSL2561_LUX_M5T
+        elif ratio <= TSL2561_LUX_K6T:
+            b = TSL2561_LUX_B6T
+            m = TSL2561_LUX_M6T
+        elif ratio <= TSL2561_LUX_K7T:
+            b = TSL2561_LUX_B7T
+            m = TSL2561_LUX_M7T
+        elif ratio > TSL2561_LUX_K8T:
+            b = TSL2561_LUX_B8T
+            m = TSL2561_LUX_M8T
+
+        temp = (channel0 * b) - (channel1 * m)
 
         # Do not allow negative lux value
         if temp < 0:
             temp = 0
 
-        # round lsb (2^(LUX_SCALE - 1))
-        temp += (1 << (self.LUX_LUXSCALE - 1))
+        # Round lsb (2^(LUX_SCALE-1))
+        temp += 1 << (TSL2561_LUX_LUXSCALE - 1)
 
-        # Strip off fractionnal portion
-        lux = int(temp >> self.LUX_LUXSCALE)
+        # Strip off fractional portion
+        lux = temp >> TSL2561_LUX_LUXSCALE
 
+        # Signal I2C had no errors
         return lux
 
-    def _wait(self):
-        if self._integration == self.INTEGRATIONTIME_13MS:
-            time.sleep(0.14)
-        elif self._integration == self.INTEGRATIONTIME_101MS:
-            time.sleep(0.102)
-        else:
-            time.sleep(0.403)
+    def lux(self):
+        '''Read sensor data, convert it to LUX and return it'''
+        broadband, ir = self._get_luminosity()
 
-    def getFullLuminosity(self):
-
-        self._enable()
-        self._wait()
-
-        result = self._i2cbus.read_i2c_block_data(
-            self._address,
-            self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN1_LOW,
-            2
-        )
-        chan1 = (result[1] << 8) | result[0]
-        print("chan1 : %#08x" % chan1)
-
-        result = self._i2cbus.read_i2c_block_data(
-            self._address,
-            self.COMMAND_BIT | self.WORD_BIT | self.REGISTER_CHAN0_LOW,
-            2
-        )
-        chan0 = (result[1] << 8) | result[0]
-        print("chan0 : %#08x" % chan0)
-
-        print("full : %#016x" % (chan1 << 16))
-
-        full = (chan1 << 16) | chan0
-        print("full : %#016x" % full)
-
-        self._disable()
-
-        return full
-
-    def getLuminosity(self):
-        x = self.getFullLuminosity()
-
-        full = x & 0xFFFF
-        ir = x >> 16
-        visi = (x & 0xFFFF) - (x >> 16)
-
-        return full, ir, visi
-
-        # if channel == self.FULLSPECTRUM:
-        #     # Reads two byte value from channel 0 (visible + infrared)
-        #     result = x & 0xFFFF
-        #     return result
-
-        # elif channel == self.INFRARED:
-        #     # Reads two byte value from channel 1 (infrared)
-        #     result = x >> 16
-        #     return result
-
-        # elif channel == self.VISIBLE:
-        #     # Reads all and subtracts out just the visible!
-        #     result = (x & 0xFFFF) - (x >> 16)
-        #     return result
-
-        # else:
-        # return None
-
-    def getLuminosityDict(self):
-
-        data = {}
-
-        data['full'], data['infrared'], data['visible'] = self.getLuminosity()
-
-        # data['full'] = self.getLuminosity(self.FULLSPECTRUM)
-        # data['visible'] = self.getLuminosity(self.VISIBLE)
-        # data['infrared'] = self.getLuminosity(self.INFRARED)
-        data['lux'] = self.calculateLux(data['full'], data['infrared'])
-
-        return data
-
-    def getLuminosityJson(self):
-        return json.dumps(self.getLuminosityDict())
+        return self._calculate_lux(broadband, ir)
