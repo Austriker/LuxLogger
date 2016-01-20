@@ -300,8 +300,8 @@ class TSL2561(object):
     def getLuminosityDict(self):
 
         data = {}
-        data['full'], data['ir'] = self._get_luminosity()
-        data['lux'] = self._calculate_lux(data['full'], data['infrared'])
+        data['broadband'], data['ir'] = self._get_luminosity()
+        data['lux'] = self._calculate_lux(data['broadband'], data['ir'])
 
         return data
 
