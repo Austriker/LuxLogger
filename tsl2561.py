@@ -180,6 +180,7 @@ class TSL2561(object):
     def calculateLux(self, ch0, ch1):
 
         if self._integration == self.INTEGRATIONTIME_13MS:
+            print("integration 13ms")
             chScale = self.LUX_CHSCALE_TINT0
         elif self._integration == self.INTEGRATIONTIME_101MS:
             chScale = self.LUX_CHSCALE_TINT1
@@ -188,6 +189,7 @@ class TSL2561(object):
 
         # Scale for gain
         if self._gain == self.GAIN_16X:
+            print("Scale Gain")
             chScale = chScale << 4
 
         # Scale the channel values
@@ -203,6 +205,7 @@ class TSL2561(object):
         ratio = (ratio1 + 1) >> 1
 
         if self._package == self.PACKAGE_T_FN_CL:
+            print("TFN package")
             if (ratio >= 0) and (ratio <= self.LUX_K1T):
                 b = self.LUX_B1T
                 m = self.LUX_M1T
@@ -287,6 +290,7 @@ class TSL2561(object):
             2
         )
         chan1 = (result[1] << 8) | result[0]
+        print("chan1 : %#08x" % chan1)
 
         result = self._i2cbus.read_i2c_block_data(
             self._address,
@@ -294,8 +298,10 @@ class TSL2561(object):
             2
         )
         chan0 = (result[1] << 8) | result[0]
+        print("chan1 : %#08x" % chan0)
 
         full = (chan1 << 16) | chan0
+        print("full : %#08x" % full)
 
         self._disable()
 
