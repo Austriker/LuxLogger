@@ -26,12 +26,11 @@ logger.addHandler(handler)
 
 
 def main():
-    sensor = TSL2561(bus=1)
-    if sensor.findSensor():
+    tsl = TSL2561(debug=1)
 
-        while True:
-            logger.info(sensor.getLuminosityJson())
-            time.sleep(1)
+    while True:
+        logger.info(tsl.getLuminosityJson())
+        time.sleep(1)
 
 
 if __name__ == "__main__":

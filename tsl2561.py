@@ -14,6 +14,7 @@ https://github.com/adafruit/Adafruit_TSL2561
 import time
 from adafruit_i2c import Adafruit_I2C
 from constants import *
+import json
 
 __author__ = 'Hugo SERRAT'
 __credits__ = [
@@ -295,3 +296,14 @@ class TSL2561(object):
         broadband, ir = self._get_luminosity()
 
         return self._calculate_lux(broadband, ir)
+
+    def getLuminosityDict(self):
+
+        data = {}
+        data['full'], data['ir'] = self._get_luminosity()
+        data['lux'] = self._calculate_lux(data['full'], data['infrared'])
+
+        return data
+
+    def getLuminosityJson(self):
+        return json.dumps(self.getLuminosityDict())
