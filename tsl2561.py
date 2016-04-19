@@ -22,9 +22,10 @@ __credits__ = [
     'Georges Toth <georges@trypill.org>'
 ]
 __license__ = 'BSD'
-__version__ = 'v2.0'
+__version__ = 'v3.1'
 
 '''HISTORY
+v3.1 - Removed exception when sensor is saturated
 v3.0 - Rewrote the i2c lib to make it work with python3
 v2.0 - Rewrote driver for Adafruit_Sensor and Auto-Gain support, and
        added lux clipping check (returns 0 lux on sensor saturation)
@@ -220,9 +221,9 @@ class TSL2561(object):
         else:
             clipThreshold = TSL2561_CLIPPING_402MS
 
-        # Return 0 lux if the sensor is saturated
+        # Return max value 65535 lux if the sensor is saturated
         if broadband > clipThreshold or ir > clipThreshold:
-            raise Exception('Sensor is saturated')
+            return 65535
 
         # Get the correct scale depending on the integration time
         if self.integration_time == TSL2561_INTEGRATIONTIME_13MS:
